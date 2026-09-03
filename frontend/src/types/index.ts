@@ -116,6 +116,8 @@ export interface GraphNode {
   type: string;
   quality_score?: number;
   integrity_status?: IntegrityStatus;
+  linked_evidence_ids?: string[];
+  linked_evidence_titles?: string[];
   properties: Record<string, any>;
 }
 
@@ -126,6 +128,8 @@ export interface GraphEdge {
   label: string;
   weight: number;
   confidence: number;
+  linked_evidence_ids?: string[];
+  linked_evidence_titles?: string[];
   properties: Record<string, any>;
 }
 

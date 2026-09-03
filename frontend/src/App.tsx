@@ -1,8 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from './components/ThemeProvider';
+import { ThemeProvider } from './context/ThemeContext';
+import { WelcomePage } from './pages/WelcomePage';
 import { LoginPage } from './pages/LoginPage';
 import { CasesPage } from './pages/CasesPage';
+import { CaseDetailPage } from './pages/CaseDetailPage';
 import { GraphWorkspacePage } from './pages/GraphWorkspacePage';
 import { HypothesesPage } from './pages/HypothesesPage';
 import { ActionsPage } from './pages/ActionsPage';
@@ -10,6 +12,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { AboutPage } from './pages/AboutPage';
 import { TutorialsPage } from './pages/TutorialsPage';
 import { AdminOfficersPage } from './pages/AdminOfficersPage';
+import { AdminAuditPage } from './pages/AdminAuditPage';
 import { AdminHealthPage } from './pages/AdminHealthPage';
 import { AdminContentPage } from './pages/AdminContentPage';
 import { AdminTutorialsPage } from './pages/AdminTutorialsPage';
@@ -36,7 +39,122 @@ export const App: React.FC = () => {
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
+          {/* Animated Welcome / Loading Page (Auto-Enters) */}
+          <Route path="/" element={<WelcomePage />} />
+          <Route path="/welcome" element={<WelcomePage />} />
+
+          {/* Authentication Gateway */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<LoginPage />} />
+          <Route path="/reset-password" element={<LoginPage />} />
+
+          {/* App Root & Aliases */}
+          <Route path="/app" element={<Navigate to="/cases" replace />} />
+          <Route path="/app/dashboard" element={<Navigate to="/cases" replace />} />
+          <Route path="/app/evidence" element={<Navigate to="/cases" replace />} />
+          <Route path="/app/graph" element={<Navigate to="/cases" replace />} />
+          <Route path="/app/admin" element={<Navigate to="/admin/officers" replace />} />
+
+          {/* Protected Case Dossiers & Detail View */}
+          <Route
+            path="/cases"
+            element={
+              <ProtectedRoute>
+                <CasesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/cases"
+            element={
+              <ProtectedRoute>
+                <CasesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cases/:id"
+            element={
+              <ProtectedRoute>
+                <CaseDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/cases/:id"
+            element={
+              <ProtectedRoute>
+                <CaseDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cases/:id/graph"
+            element={
+              <ProtectedRoute>
+                <GraphWorkspacePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/cases/:id/graph"
+            element={
+              <ProtectedRoute>
+                <GraphWorkspacePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cases/:id/hypotheses"
+            element={
+              <ProtectedRoute>
+                <HypothesesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/cases/:id/hypotheses"
+            element={
+              <ProtectedRoute>
+                <HypothesesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cases/:id/actions"
+            element={
+              <ProtectedRoute>
+                <ActionsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/cases/:id/actions"
+            element={
+              <ProtectedRoute>
+                <ActionsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cases/:id/reports"
+            element={
+              <ProtectedRoute>
+                <ReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/cases/:id/reports"
+            element={
+              <ProtectedRoute>
+                <ReportsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Knowledge, Academy & Guidance */}
           <Route
             path="/about"
             element={
@@ -54,6 +172,14 @@ export const App: React.FC = () => {
             }
           />
           <Route
+            path="/app/tutorials"
+            element={
+              <ProtectedRoute>
+                <TutorialsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/help"
             element={
               <ProtectedRoute>
@@ -62,10 +188,36 @@ export const App: React.FC = () => {
             }
           />
           <Route
+            path="/app/help"
+            element={
+              <ProtectedRoute>
+                <HelpPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Administration & Studio */}
+          <Route
             path="/admin/officers"
             element={
               <ProtectedRoute>
                 <AdminOfficersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/audit"
+            element={
+              <ProtectedRoute>
+                <AdminAuditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/admin/audit"
+            element={
+              <ProtectedRoute>
+                <AdminAuditPage />
               </ProtectedRoute>
             }
           />
@@ -109,47 +261,9 @@ export const App: React.FC = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/cases"
-            element={
-              <ProtectedRoute>
-                <CasesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cases/:id/graph"
-            element={
-              <ProtectedRoute>
-                <GraphWorkspacePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cases/:id/hypotheses"
-            element={
-              <ProtectedRoute>
-                <HypothesesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cases/:id/actions"
-            element={
-              <ProtectedRoute>
-                <ActionsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cases/:id/reports"
-            element={
-              <ProtectedRoute>
-                <ReportsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/cases" replace />} />
+
+          {/* Safe Default Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

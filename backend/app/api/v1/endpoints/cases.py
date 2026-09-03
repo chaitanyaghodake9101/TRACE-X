@@ -274,3 +274,161 @@ def delete_case(
         request=request
     )
     return {"message": f"Case {case_num} successfully deleted."}
+
+# --- Case Officer Assignments ---
+
+@router.get("/{case_id}/officers")
+def list_case_officers(
+    case_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    case = get_case_with_permission(case_id, db, current_user)
+    memberships = case.case_memberships or []
+    
+    officers = []
+    # If primary assigned_to is set and not already in memberships, include as lead
+    member_user_ids = {m.user_id for m in memberships if m.is_active}
+    
+    if case.assigned_to and case.assigned_to not in member_user_ids:
+        lead_u = db.query(User).filter(User.id == case.assigned_to).first()
+        if lead_u:
+            officers.append({
+                "id": f"lead_{lead_u.id}",
+                "case_id": case.id,
+                "user_id": lead_u.id,
+                "full_name": lead_u.full_name,
+                "email": lead_u.email,
+                "badge_number": lead_u.badge_number,
+                "role": lead_u.role.value if hasattr(lead_u.role, 'value') else str(lead_u.role),
+                "station": lead_u.station,
+                "assignment_role": "lead_investigator",
+                "is_active": True,
+                "assigned_at": case.created_at.isoformat()
+            })
+
+    for m in memberships:
+        if not m.is_active:
+            continue
+        u = m.user
+        if u:
+            officers.append({
+                "id": m.id,
+                "case_id": case.id,
+                "user_id": u.id,
+                "full_name": u.full_name,
+                "email": u.email,
+                "badge_number": u.badge_number,
+                "role": u.role.value if hasattr(u.role, 'value') else str(u.role),
+                "station": u.station,
+                "assignment_role": m.assignment_role,
+                "is_active": m.is_active,
+                "assigned_at": m.assigned_at.isoformat() if m.assigned_at else None
+            })
+
+    return officers
+
+@router.post("/{case_id}/officers")
+def assign_officer_to_case(
+    case_id: str,
+    payload: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.SENIOR_INVESTIGATOR]))
+):
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    user_id = payload.get("user_id") or payload.get("officer_id")
+    assignment_role = payload.get("assignment_role", "investigator")
+
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    officer_user = db.query(User).filter(User.id == user_id).first()
+    if not officer_user:
+        raise HTTPException(status_code=404, detail="Officer user not found")
+
+    from app.models.officer_extension import CaseMembership
+    existing = db.query(CaseMembership).filter(
+        CaseMembership.case_id == case_id,
+        CaseMembership.user_id == user_id
+    ).first()
+
+    if existing:
+        existing.is_active = True
+        existing.assignment_role = assignment_role
+        existing.assigned_by = current_user.id
+        db.commit()
+        db.refresh(existing)
+        mem = existing
+    else:
+        mem = CaseMembership(
+            case_id=case_id,
+            user_id=user_id,
+            assignment_role=assignment_role,
+            is_active=True,
+            assigned_by=current_user.id
+        )
+        db.add(mem)
+        db.commit()
+        db.refresh(mem)
+
+    log_audit_event(
+        db=db,
+        action="ASSIGN_CASE_OFFICER",
+        resource_type="case_membership",
+        resource_id=mem.id,
+        user=current_user,
+        case_id=case_id,
+        details={"officer_email": officer_user.email, "role": assignment_role},
+        request=request
+    )
+
+    return {
+        "id": mem.id,
+        "case_id": case_id,
+        "user_id": officer_user.id,
+        "full_name": officer_user.full_name,
+        "email": officer_user.email,
+        "badge_number": officer_user.badge_number,
+        "role": officer_user.role.value if hasattr(officer_user.role, 'value') else str(officer_user.role),
+        "assignment_role": mem.assignment_role,
+        "is_active": mem.is_active
+    }
+
+@router.delete("/{case_id}/officers/{officer_id}")
+def remove_officer_from_case(
+    case_id: str,
+    officer_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([UserRole.ADMIN, UserRole.SENIOR_INVESTIGATOR]))
+):
+    from app.models.officer_extension import CaseMembership
+    # Can match by membership ID or user ID
+    mem = db.query(CaseMembership).filter(
+        CaseMembership.case_id == case_id,
+        (CaseMembership.id == officer_id) | (CaseMembership.user_id == officer_id)
+    ).first()
+
+    if not mem:
+        raise HTTPException(status_code=404, detail="Case officer assignment not found")
+
+    mem.is_active = False
+    db.commit()
+
+    log_audit_event(
+        db=db,
+        action="REMOVE_CASE_OFFICER",
+        resource_type="case_membership",
+        resource_id=mem.id,
+        user=current_user,
+        case_id=case_id,
+        details={"removed_user_id": mem.user_id},
+        request=request
+    )
+
+    return {"message": "Officer removed from case successfully."}
+

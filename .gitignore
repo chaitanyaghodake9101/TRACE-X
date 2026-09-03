@@ -75,11 +75,12 @@ frontend/dist-ssr/
 # Database & Storage
 *.sqlite3
 *.db
-data/
-neo4j-data/
-postgres-data/
+/data/
+/neo4j-data/
+/postgres-data/
 backend/app/uploads/
 uploads/
+!frontend/src/data/
 
 
 # IDE / OS

@@ -14,6 +14,8 @@ from app.services.custody_service import generate_integrity_pdf_report
 
 router = APIRouter()
 
+@router.get("/cases/{case_id}/report/pdf")
+@router.get("/cases/{case_id}/reports")
 @router.post("/cases/{case_id}/reports")
 def export_case_pdf_dossier(
     case_id: str,

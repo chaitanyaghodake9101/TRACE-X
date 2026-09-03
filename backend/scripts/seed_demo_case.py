@@ -18,9 +18,12 @@ from app.services.custody_service import compute_evidence_sha256, log_custody_ev
 from app.services.quality_engine import recalculate_case_evidence_quality
 from app.services.hypothesis_engine import recalculate_case_hypotheses
 from app.services.action_engine import prioritize_case_actions
+from app.core.database import Base, engine
+import app.models
 
 def seed_demo():
     print("[*] Starting TRACE-X Production Demo Case Seeder...")
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
@@ -52,12 +55,17 @@ def seed_demo():
                 user_map[role] = u
                 print(f"  [+] Created User: {email} ({role.value}) [Badge: {badge}]")
             else:
+                existing.hashed_password = get_password_hash(pwd)
+                existing.role = role
+                existing.full_name = name
                 existing.phone_number = phone
                 existing.badge_number = badge
                 existing.station = station
+                existing.is_active = True
                 db.commit()
                 db.refresh(existing)
                 user_map[role] = existing
+                print(f"  [*] Updated User: {email} ({role.value}) [Badge: {badge}]")
 
         senior_inv = user_map[UserRole.SENIOR_INVESTIGATOR]
 

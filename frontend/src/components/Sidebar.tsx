@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useParams } from 'react-router-dom';
 import {
+  FolderKanban,
   Network,
   GitCompare,
   ListOrdered,
@@ -22,6 +23,12 @@ export const Sidebar: React.FC = () => {
 
   const navItems = [
     ...(id ? [
+      {
+        to: `/cases/${id}`,
+        icon: FolderKanban,
+        label: 'Dossier & Entities',
+        badge: 'POI & Assets'
+      },
       {
         to: `/cases/${id}/graph`,
         icon: Network,
@@ -73,6 +80,12 @@ export const Sidebar: React.FC = () => {
       icon: Users,
       label: 'Officers & Personnel',
       badge: 'Extended Profiles'
+    },
+    {
+      to: `/admin/audit`,
+      icon: ShieldAlert,
+      label: 'System Audit Log',
+      badge: 'PDF / CSV'
     },
     {
       to: `/admin/content`,

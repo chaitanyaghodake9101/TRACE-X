@@ -24,6 +24,8 @@ from app.api.v1.endpoints.admin import require_admin, require_admin_or_auditor
 
 router = APIRouter(prefix="/admin/officers", tags=["Officer Management"])
 
+@router.get("", response_model=List[EnhancedOfficerOut])
+@router.get("/", response_model=List[EnhancedOfficerOut])
 @router.get("/extended", response_model=List[EnhancedOfficerOut])
 def list_enhanced_officers(
     search: Optional[str] = None,
@@ -83,6 +85,8 @@ def list_enhanced_officers(
         )
     return results
 
+@router.post("", response_model=EnhancedOfficerOut)
+@router.post("/", response_model=EnhancedOfficerOut)
 @router.post("/create-extended", response_model=EnhancedOfficerOut)
 def create_enhanced_officer(
     officer_in: EnhancedOfficerCreate,
@@ -155,6 +159,18 @@ def create_enhanced_officer(
         details={"email": user.email, "role": user.role.value, "badge": user.badge_number},
         request=request
     )
+
+    try:
+        from app.api.v1.endpoints.ws import broadcast_event_sync
+        broadcast_event_sync({
+            "type": "officer.created",
+            "resource_type": "officer",
+            "resource_id": user.id,
+            "version": 1,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception:
+        pass
 
     return EnhancedOfficerOut(
         id=user.id,
@@ -394,3 +410,113 @@ def assign_officer_to_case(
         assigned_by=membership.assigned_by,
         assigned_at=membership.assigned_at
     )
+
+@router.get("/{officer_id}", response_model=EnhancedOfficerOut)
+def get_officer_details(
+    officer_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_auditor)
+):
+    u = db.query(User).filter(User.id == officer_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Officer not found")
+
+    created_count = db.query(Case).filter(Case.created_by == u.id).count()
+    assigned_count = db.query(Case).filter(Case.assigned_to == u.id).count()
+    prof_out = None
+    if hasattr(u, "officer_profile") and u.officer_profile:
+        prof = u.officer_profile[0] if isinstance(u.officer_profile, list) else u.officer_profile
+        prof_out = OfficerProfileOut.from_orm(prof) if prof else None
+
+    return EnhancedOfficerOut(
+        id=u.id,
+        email=u.email,
+        full_name=u.full_name,
+        role=u.role,
+        phone_number=u.phone_number,
+        badge_number=u.badge_number,
+        station=u.station,
+        is_active=u.is_active,
+        has_completed_tour=u.has_completed_tour,
+        created_at=u.created_at,
+        updated_at=u.updated_at,
+        created_cases_count=created_count,
+        assigned_cases_count=assigned_count,
+        profile=prof_out
+    )
+
+@router.patch("/{officer_id}", response_model=EnhancedOfficerOut)
+def patch_officer(
+    officer_id: str,
+    officer_in: EnhancedOfficerUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    return update_enhanced_officer_profile(
+        officer_id=officer_id,
+        officer_in=officer_in,
+        request=request,
+        db=db,
+        current_user=current_user
+    )
+
+@router.post("/{officer_id}/deactivate")
+def deactivate_officer(
+    officer_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    user = db.query(User).filter(User.id == officer_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Officer not found")
+
+    user.is_active = False
+    user.updated_at = datetime.utcnow()
+    db.commit()
+
+    log_audit_event(
+        db=db,
+        action="DEACTIVATE_OFFICER_ACCOUNT",
+        resource_type="user",
+        resource_id=user.id,
+        user=current_user,
+        details={"email": user.email, "badge": user.badge_number},
+        request=request
+    )
+
+    return {"message": f"Officer {user.full_name} deactivated successfully."}
+
+@router.post("/{officer_id}/reset-password")
+def trigger_officer_password_reset(
+    officer_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    user = db.query(User).filter(User.id == officer_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Officer not found")
+
+    import secrets
+    temp_pass = f"TRACEX-{secrets.token_hex(4).upper()}!"
+    user.hashed_password = get_password_hash(temp_pass)
+    user.updated_at = datetime.utcnow()
+    db.commit()
+
+    log_audit_event(
+        db=db,
+        action="ADMIN_RESET_OFFICER_PASSWORD",
+        resource_type="user",
+        resource_id=user.id,
+        user=current_user,
+        details={"email": user.email},
+        request=request
+    )
+
+    return {
+        "message": f"Temporary password reset generated for {user.full_name}.",
+        "temporary_password": temp_pass
+    }
+

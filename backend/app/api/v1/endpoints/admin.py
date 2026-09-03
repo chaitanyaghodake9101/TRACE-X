@@ -584,3 +584,163 @@ def update_system_config(
         "message": "System configuration updated.",
         "config": config_in.model_dump()
     }
+
+# --- AUDIT LOG MANAGEMENT & EXPORT ---
+
+@router.get("/audit")
+def list_admin_audit_logs(
+    resource_type: Optional[str] = None,
+    actor_officer_id: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_auditor)
+):
+    query = db.query(AuditLog)
+
+    if resource_type and resource_type != "all":
+        query = query.filter(AuditLog.resource_type == resource_type)
+
+    if actor_officer_id and actor_officer_id != "all":
+        query = query.filter(AuditLog.user_id == actor_officer_id)
+
+    if from_date:
+        try:
+            dt_from = datetime.fromisoformat(from_date)
+            query = query.filter(AuditLog.timestamp >= dt_from)
+        except Exception:
+            pass
+
+    if to_date:
+        try:
+            dt_to = datetime.fromisoformat(to_date)
+            query = query.filter(AuditLog.timestamp <= dt_to)
+        except Exception:
+            pass
+
+    if search:
+        search_pattern = f"%{search.lower()}%"
+        query = query.filter(
+            (func.lower(AuditLog.action).like(search_pattern)) |
+            (func.lower(AuditLog.resource_type).like(search_pattern)) |
+            (func.lower(AuditLog.resource_id).like(search_pattern))
+        )
+
+    total_count = query.count()
+    logs = query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit).all()
+
+    return {
+        "total": total_count,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "actor_name": log.user.full_name if log.user else (log.user_id or "System Automated"),
+                "actor_badge": log.user.badge_number if log.user else "—",
+                "case_id": log.case_id,
+                "action": log.action,
+                "resource_type": log.resource_type,
+                "resource_id": log.resource_id,
+                "details": log.details_json,
+                "ip_address": log.ip_address,
+                "timestamp": log.timestamp.isoformat() if log.timestamp else None
+            }
+            for log in logs
+        ]
+    }
+
+from fastapi.responses import StreamingResponse
+import csv
+import io
+from app.services.report_service import generate_audit_pdf_report
+
+@router.get("/audit/export/pdf")
+def export_audit_logs_pdf(
+    resource_type: Optional[str] = None,
+    actor_officer_id: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_auditor)
+):
+    query = db.query(AuditLog)
+    if resource_type and resource_type != "all":
+        query = query.filter(AuditLog.resource_type == resource_type)
+    if actor_officer_id and actor_officer_id != "all":
+        query = query.filter(AuditLog.user_id == actor_officer_id)
+    if from_date:
+        try:
+            query = query.filter(AuditLog.timestamp >= datetime.fromisoformat(from_date))
+        except Exception:
+            pass
+    if to_date:
+        try:
+            query = query.filter(AuditLog.timestamp <= datetime.fromisoformat(to_date))
+        except Exception:
+            pass
+
+    logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    pdf_buffer = generate_audit_pdf_report(db, logs)
+
+    filename = f"TRACE_X_Audit_Log_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
+@router.get("/audit/export/csv")
+def export_audit_logs_csv(
+    resource_type: Optional[str] = None,
+    actor_officer_id: Optional[str] = None,
+    limit: int = 500,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_auditor)
+):
+    query = db.query(AuditLog)
+    if resource_type and resource_type != "all":
+        query = query.filter(AuditLog.resource_type == resource_type)
+    if actor_officer_id and actor_officer_id != "all":
+        query = query.filter(AuditLog.user_id == actor_officer_id)
+
+    logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Log ID", "Timestamp (UTC)", "Action", "Resource Type", "Resource ID", "Actor ID", "Actor Name", "Actor Badge", "IP Address", "Details JSON"])
+
+    for l in logs:
+        writer.writerow([
+            l.id,
+            l.timestamp.isoformat() if l.timestamp else "",
+            l.action,
+            l.resource_type,
+            l.resource_id or "",
+            l.user_id or "",
+            l.user.full_name if l.user else "",
+            l.user.badge_number if l.user else "",
+            l.ip_address or "",
+            str(l.details_json or {})
+        ])
+
+    csv_bytes = io.BytesIO(output.getvalue().encode('utf-8'))
+    filename = f"TRACE_X_Audit_Log_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    return StreamingResponse(
+        csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+

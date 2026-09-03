@@ -2,7 +2,7 @@ from app.core.database import Base
 from app.models.user import User, UserRole, PasswordResetToken, EmailVerificationToken, RefreshTokenSession, AuthRateLimitEvent
 from app.models.case import Case, CaseStatus, CasePriority
 from app.models.evidence import Evidence, EvidenceSourceType, EvidenceQualityScore, CustodyEvent, IntegrityReport, IntegrityStatus
-from app.models.entity import Entity, EntityType, Relationship, RelationshipType
+from app.models.entity import Entity, EntityType, Relationship, RelationshipType, EvidenceEntityLink, RelationshipEvidenceLink
 from app.models.hypothesis import Hypothesis, HypothesisStatus, EvidenceHypothesis, HypothesisRelationType, HypothesisScore, HypothesisConfidenceLevel
 from app.models.action import InvestigativeAction, ActionType, ActionStatus, ActionOutcome
 from app.models.audit import AuditLog
@@ -39,6 +39,8 @@ __all__ = [
     "EntityType",
     "Relationship",
     "RelationshipType",
+    "EvidenceEntityLink",
+    "RelationshipEvidenceLink",
     "Hypothesis",
     "HypothesisStatus",
     "EvidenceHypothesis",

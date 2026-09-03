@@ -138,3 +138,47 @@ async def websocket_event_stream(
         manager.disconnect(websocket)
     except Exception:
         manager.disconnect(websocket)
+
+from fastapi.responses import StreamingResponse
+from app.models.events import DomainOutboxEvent
+
+@router.get("/events/stream")
+async def sse_event_stream(
+    token: Optional[str] = Query(None),
+    case_id: Optional[str] = Query(None)
+):
+    """Server-Sent Events (SSE) stream for environments without WebSocket support."""
+    async def event_generator():
+        # Yield initial connection heartbeat
+        yield f"data: {json.dumps({'event': 'stream.connected', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
+        while True:
+            await asyncio.sleep(8)
+            # Periodic heartbeat event
+            yield f"data: {json.dumps({'event': 'stream.heartbeat', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
+
+    from datetime import datetime
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@router.get("/events/poll")
+def poll_recent_events(
+    since: Optional[str] = Query(None),
+    limit: int = 20
+):
+    """Lightweight REST polling fallback endpoint returning recent event digests."""
+    db: Session = SessionLocal()
+    try:
+        query = db.query(DomainOutboxEvent).order_by(DomainOutboxEvent.created_at.desc())
+        events = query.limit(limit).all()
+        return [
+            {
+                "id": ev.id,
+                "event_type": ev.event_type,
+                "aggregate_type": ev.aggregate_type,
+                "aggregate_id": ev.aggregate_id,
+                "created_at": ev.created_at.isoformat() if ev.created_at else None
+            }
+            for ev in events
+        ]
+    finally:
+        db.close()
+

@@ -3,8 +3,24 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-bg-canvas: #f8fafc;
+    --color-text-main: #0f172a;
+    --color-card-bg: #ffffff;
+    --color-card-border: #e2e8f0;
+  }
+
+  .dark {
+    --color-bg-canvas: #020617;
+    --color-text-main: #f8fafc;
+    --color-card-bg: #0f172a;
+    --color-card-border: #1e293b;
+  }
+
   body {
-    @apply bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-cyan-500 selection:text-white;
+    @apply min-h-screen antialiased selection:bg-cyan-500 selection:text-white transition-colors duration-300;
+    background-color: var(--color-bg-canvas);
+    color: var(--color-text-main);
   }
 }
 
@@ -14,12 +30,52 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #475569;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #64748b;
+}
+
+/* Cyber Glow and Pulse Keyframes */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.35), 0 0 30px rgba(6, 182, 212, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(6, 182, 212, 0.6), 0 0 60px rgba(59, 130, 246, 0.3);
+  }
+}
+
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes scanLine {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(1000%);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 6s linear infinite;
+}
+
+.animate-scan-line {
+  animation: scanLine 8s linear infinite;
 }

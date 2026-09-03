@@ -169,6 +169,29 @@ export const casesApi = {
   delete: async (id: string) => {
     const res = await api.delete(`/cases/${id}`);
     return res.data;
+  },
+  getGraph: async (id: string, minQualityScore?: number, entityTypes?: string[]) => {
+    let url = `/cases/${id}/graph`;
+    const params = new URLSearchParams();
+    if (minQualityScore !== undefined) params.append('min_quality_score', minQualityScore.toString());
+    if (entityTypes && entityTypes.length > 0) {
+      entityTypes.forEach(et => params.append('entity_types', et));
+    }
+    if (params.toString()) url += `?${params.toString()}`;
+    const res = await api.get<GraphData>(url);
+    return res.data;
+  },
+  listOfficers: async (id: string) => {
+    const res = await api.get<any[]>(`/cases/${id}/officers`);
+    return res.data;
+  },
+  assignOfficer: async (id: string, data: { user_id: string; assignment_role?: string }) => {
+    const res = await api.post<any>(`/cases/${id}/officers`, data);
+    return res.data;
+  },
+  removeOfficer: async (id: string, officerId: string) => {
+    const res = await api.delete(`/cases/${id}/officers/${officerId}`);
+    return res.data;
   }
 };
 
@@ -357,6 +380,51 @@ export const reportsApi = {
   },
   downloadIntegrityReport: async (caseId: string) => {
     const res = await api.post(`/cases/${caseId}/integrity-report`, {}, { responseType: 'blob' });
+    return res.data;
+  }
+};
+
+export const auditApi = {
+  list: async (params?: {
+    resource_type?: string;
+    actor_officer_id?: string;
+    from_date?: string;
+    to_date?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    let url = '/admin/audit';
+    const q = new URLSearchParams();
+    if (params?.resource_type && params.resource_type !== 'all') q.append('resource_type', params.resource_type);
+    if (params?.actor_officer_id && params.actor_officer_id !== 'all') q.append('actor_officer_id', params.actor_officer_id);
+    if (params?.from_date) q.append('from_date', params.from_date);
+    if (params?.to_date) q.append('to_date', params.to_date);
+    if (params?.search) q.append('search', params.search);
+    if (params?.limit) q.append('limit', params.limit.toString());
+    if (params?.offset !== undefined) q.append('offset', params.offset.toString());
+    if (q.toString()) url += `?${q.toString()}`;
+    const res = await api.get<{ total: number; limit: number; offset: number; items: any[] }>(url);
+    return res.data;
+  },
+  exportPdf: async (params?: { resource_type?: string; actor_officer_id?: string; from_date?: string; to_date?: string }) => {
+    let url = '/admin/audit/export/pdf';
+    const q = new URLSearchParams();
+    if (params?.resource_type && params.resource_type !== 'all') q.append('resource_type', params.resource_type);
+    if (params?.actor_officer_id && params.actor_officer_id !== 'all') q.append('actor_officer_id', params.actor_officer_id);
+    if (params?.from_date) q.append('from_date', params.from_date);
+    if (params?.to_date) q.append('to_date', params.to_date);
+    if (q.toString()) url += `?${q.toString()}`;
+    const res = await api.get(url, { responseType: 'blob' });
+    return res.data;
+  },
+  exportCsv: async (params?: { resource_type?: string; actor_officer_id?: string }) => {
+    let url = '/admin/audit/export/csv';
+    const q = new URLSearchParams();
+    if (params?.resource_type && params.resource_type !== 'all') q.append('resource_type', params.resource_type);
+    if (params?.actor_officer_id && params.actor_officer_id !== 'all') q.append('actor_officer_id', params.actor_officer_id);
+    if (q.toString()) url += `?${q.toString()}`;
+    const res = await api.get(url, { responseType: 'blob' });
     return res.data;
   }
 };
@@ -718,6 +786,53 @@ export const featureFlagsApi = {
       is_enabled: isEnabled,
       description
     });
+    return res.data;
+  }
+};
+
+export const officersApi = {
+  list: async (params?: { search?: string; role?: string; is_active?: boolean; district?: string }) => {
+    let url = '/admin/officers';
+    const q = new URLSearchParams();
+    if (params?.search) q.append('search', params.search);
+    if (params?.role && params.role !== 'all') q.append('role', params.role);
+    if (params?.is_active !== undefined) q.append('is_active', params.is_active.toString());
+    if (params?.district && params.district !== 'all') q.append('district', params.district);
+    if (q.toString()) url += `?${q.toString()}`;
+    const res = await api.get<EnhancedOfficer[]>(url);
+    return res.data;
+  },
+  get: async (id: string) => {
+    const res = await api.get<EnhancedOfficer>(`/admin/officers/${id}`);
+    return res.data;
+  },
+  create: async (data: any) => {
+    const res = await api.post<EnhancedOfficer>('/admin/officers', data);
+    return res.data;
+  },
+  update: async (id: string, data: any) => {
+    const res = await api.patch<EnhancedOfficer>(`/admin/officers/${id}`, data);
+    return res.data;
+  },
+  deactivate: async (id: string) => {
+    const res = await api.post<{ message: string }>(`/admin/officers/${id}/deactivate`);
+    return res.data;
+  },
+  resetPassword: async (id: string) => {
+    const res = await api.post<{ message: string; temporary_password?: string }>(`/admin/officers/${id}/reset-password`);
+    return res.data;
+  },
+  getHistory: async (id: string) => {
+    const res = await api.get<OfficerHistory>(`/admin/officers/${id}/history`);
+    return res.data;
+  }
+};
+
+export const realtimeEventsApi = {
+  poll: async (since?: string) => {
+    let url = '/events/poll';
+    if (since) url += `?since=${encodeURIComponent(since)}`;
+    const res = await api.get<any[]>(url);
     return res.data;
   }
 };

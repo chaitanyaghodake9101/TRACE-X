@@ -69,6 +69,8 @@ class GraphNode(BaseModel):
     label: str
     type: str
     quality_score: Optional[float] = None
+    linked_evidence_ids: List[str] = []
+    linked_evidence_titles: List[str] = []
     properties: Dict[str, Any] = {}
 
 class GraphEdge(BaseModel):
@@ -76,6 +78,10 @@ class GraphEdge(BaseModel):
     source: str
     target: str
     label: str
+    weight: float = 1.0
+    confidence: float = 1.0
+    linked_evidence_ids: List[str] = []
+    linked_evidence_titles: List[str] = []
     properties: Dict[str, Any] = {}
 
 class GraphData(BaseModel):

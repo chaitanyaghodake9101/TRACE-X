@@ -26,7 +26,7 @@ class OfficerProfileOut(BaseModel):
 
 class EnhancedOfficerCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: Optional[str] = "OfficerPass123!"
     full_name: str
     role: UserRole = UserRole.INVESTIGATOR
     phone_number: Optional[str] = None

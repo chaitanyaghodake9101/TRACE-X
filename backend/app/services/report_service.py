@@ -280,3 +280,103 @@ def generate_case_pdf_dossier(db: Session, case_id: str) -> io.BytesIO:
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+def generate_audit_pdf_report(db: Session, audit_logs: List[AuditLog]) -> io.BytesIO:
+    """
+    Generates an official multi-page Administrative Audit Log PDF Report.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'AuditTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        leading=20,
+        textColor=colors.HexColor('#0f172a'),
+        alignment=1,
+        spaceAfter=8
+    )
+    subtitle_style = ParagraphStyle(
+        'AuditSubTitle',
+        parent=styles['Normal'],
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor('#475569'),
+        alignment=1,
+        spaceAfter=14
+    )
+    cell_style = ParagraphStyle(
+        'AuditCell',
+        parent=styles['Normal'],
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.HexColor('#1e293b')
+    )
+    cell_bold = ParagraphStyle(
+        'AuditCellBold',
+        parent=cell_style,
+        fontName='Helvetica-Bold'
+    )
+
+    story = []
+    story.append(Paragraph("TRACE-X — SYSTEM AUDIT & CHAIN OF CUSTODY LOG", title_style))
+    story.append(Paragraph(f"Official Audit Export • Generated on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')} • Total Events: {len(audit_logs)} • RESTRICTED / COMPLIANCE RECORD", subtitle_style))
+    story.append(Spacer(1, 8))
+
+    # Audit Table
+    headers = [
+        Paragraph("<b>Timestamp (UTC)</b>", cell_bold),
+        Paragraph("<b>Action</b>", cell_bold),
+        Paragraph("<b>Resource Type</b>", cell_bold),
+        Paragraph("<b>Resource ID</b>", cell_bold),
+        Paragraph("<b>Actor (Officer)</b>", cell_bold),
+        Paragraph("<b>IP Address</b>", cell_bold)
+    ]
+    rows = [headers]
+
+    for log in audit_logs:
+        actor_name = log.user.full_name if log.user else (log.user_id or "System Automated")
+        ts_str = log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "N/A"
+        rows.append([
+            Paragraph(ts_str, cell_style),
+            Paragraph(log.action, cell_bold),
+            Paragraph(log.resource_type, cell_style),
+            Paragraph((log.resource_id or "—")[:16], cell_style),
+            Paragraph(actor_name, cell_style),
+            Paragraph(log.ip_address or "—", cell_style)
+        ])
+
+    table = Table(rows, colWidths=[95, 115, 80, 85, 110, 55])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f766e')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#94a3b8')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 16))
+
+    # Sign-off block
+    sig_data = [
+        [Paragraph("<b>Certified System Auditor:</b> ___________________________", cell_style), Paragraph("<b>Security Directorate Approval:</b> ___________________________", cell_style)],
+        [Paragraph("Date: ________________________", cell_style), Paragraph("Date: ________________________", cell_style)]
+    ]
+    sig_table = Table(sig_data, colWidths=[270, 270])
+    story.append(KeepTogether(sig_table))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
